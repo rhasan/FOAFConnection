@@ -1,6 +1,7 @@
 package website.web.foaf;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -31,6 +32,9 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.rdf.model.impl.StatementImpl;
 import com.hp.hpl.jena.sparql.vocabulary.FOAF;
+import com.hp.hpl.jena.update.GraphStore;
+import com.hp.hpl.jena.update.GraphStoreFactory;
+import com.hp.hpl.jena.update.UpdateAction;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
 
@@ -38,7 +42,7 @@ public class FoafProcessorJena {
 	
 	private Dataset dataset = DatasetFactory.createMem();
 	private Logger logger = Logger.getLogger(this.getClass());
-	private int connectionDegree = 6;
+	private static int connectionDegree = 6;
 	
 	private String foafConNS = "http://ns.inria.fr/ratio4ta/others/foafc.owl#";
 	
@@ -48,9 +52,22 @@ public class FoafProcessorJena {
 	
 	private HashMap<String, Person> allPerson = null;
 	
-	public FoafProcessorJena(int connectionDegree) {
+	private static FoafProcessorJena instance = null;
+	
+	public void clear() {
+		instance = null;
+	}
+	
+	public static FoafProcessorJena getInstance() {
 		
-		this.connectionDegree = connectionDegree;
+		if(instance==null)
+			instance = new FoafProcessorJena(connectionDegree);
+		return instance;
+	}
+	
+	public FoafProcessorJena(int cd) {
+		
+		connectionDegree = cd;
 		initIgnore();
 	}
 	
@@ -170,7 +187,7 @@ public class FoafProcessorJena {
 		processFoafConnections(foafUri, givenFoafModel, 0);
 		
 		//logger
-		Utility.logJenaModel(givenFoafModel, logger);
+		Utility.logJenaModelN3(givenFoafModel, logger);
 		//create a working copy of the model with removing the blank nodes and unnecessary things such as graph names
 		//refineModel();
 		mapRDF2Object();
@@ -272,7 +289,7 @@ public class FoafProcessorJena {
 			for ( ; results.hasNext() ; )
 		    {
 			  
-		      QuerySolution soln = results.nextSolution() ;
+		      QuerySolution soln = results.nextSolution();
 		      
 		      Person currentPerson = personFromHash(givenFoafUri);		      
 		      
@@ -281,11 +298,39 @@ public class FoafProcessorJena {
 		      Resource couldBeIntro = soln.getResource("f2");
 		      
 		      Person couldBeIntroPerson = personFromHash(couldBeIntro.getURI());
-		      currentPerson.getFriends().add(couldBeIntroPerson);
+		      currentPerson.getCouldBeIntroduced().add(couldBeIntroPerson);
 		    }
 			
-		} finally { qExec.close() ; }		
+		} finally { qExec.close() ; }
+		
+		SparqlInsert();
 
+	}
+	
+	public void SparqlInsert() {
+		//GraphStore graphStore = GraphStoreFactory.create(dataset) ;
+		String updateString = "INSERT DATA { GRAPH <http://localhost:8080/website/j/4> { <http://example/book1>  <http://example.org/ns#price>  42 } }";
+		UpdateAction.parseExecute(updateString, dataset);
+		logger.debug("Print from insert");
+		printInsert();
+
+	}
+	
+	public void printInsert() {
+		String query = "select * where  { GRAPH <http://localhost:8080/website/j/4> { ?s  ?p  ?o } }";
+		
+		QueryExecution qExec = QueryExecutionFactory.create(query, dataset);
+		ResultSet results = qExec.execSelect();
+		logger.debug(ResultSetFormatter.asText(results));
+		
+	}
+	
+	public Model getNamedGraphStatements(String graphURI) {
+		String query = "construct {?s ?p ?o} where  { GRAPH <"+graphURI+"> { ?s  ?p  ?o } }";
+		QueryExecution qExec = QueryExecutionFactory.create(query, dataset);
+		Model refinedModel = qExec.execConstruct();
+
+		return refinedModel;
 	}
 	
 	public void constructFirstDegreeConnections() {

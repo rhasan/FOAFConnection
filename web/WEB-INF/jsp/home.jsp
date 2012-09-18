@@ -2,6 +2,7 @@
 <%@ page import="website.web.model.Person" %>
 <jsp:useBean id="person" scope="request" class="website.web.model.Person" />
 <jsp:useBean id="friendsList" scope="request" class="java.util.ArrayList" />
+<jsp:useBean id="couldBeIntroList" scope="request" class="java.util.ArrayList" />
 <jsp:useBean id="errorMessage" scope="request" class="java.lang.String" />
 
 <html>
@@ -16,18 +17,70 @@ ${errorMessage}
 	   
 	   <input type="submit" name="submit" value="Submit" />
 	</form>
+	
 	<%@ include file="person.jsp" %>
 
-	<ul>
-		<% 
-      Iterator it = friendsList.iterator();
-      while (it.hasNext())
-      {
-         Person personItem = (Person) it.next();
-   %>
-		<li><%=personItem.getName()%>
-		</li>
-	<% } %>
-	</ul>
+
+	<div class="friends-block">
+		<%
+			if(friendsList.size()>0) {
+		%>
+			<h2>Knows</h2>
+		<%
+			}
+		%>
+	
+	
+		<ul>
+			<%
+				Iterator it = friendsList.iterator();
+				
+				while (it.hasNext()) {
+					Person personItem = (Person) it.next();
+			%>
+			<li>
+				<ul>
+					<li><%=personItem.getUri() %></li>
+					<%if(personItem.getName() != null) { %>
+						<li><%=personItem.getName()%></li>
+					<%} %>
+				</ul>
+			</li>
+			<%
+				}
+			%>
+		</ul>
+	</div>
+
+	<div class="couldbe-block">
+		
+		<%
+			if(couldBeIntroList.size()>0) {
+		%>
+			<h2>Could be introduced to</h2>
+		<%
+			}
+		%>
+	
+	
+		<ul>
+			<%
+				Iterator it1 = couldBeIntroList.iterator();
+				while (it1.hasNext()) {
+					Person personItem = (Person) it1.next();
+			%>
+			<li>
+				<ul>
+					<li><%=personItem.getUri() %></li>
+					<%if(personItem.getName() != null) { %>
+						<li><%=personItem.getName()%></li>
+					<%} %>
+				</ul>
+			</li>
+			<%
+				}
+			%>
+		</ul>
+	</div>
 </body>
 </html>

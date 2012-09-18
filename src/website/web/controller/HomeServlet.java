@@ -26,17 +26,20 @@ public class HomeServlet extends HttpServlet {
 
 	private RequestDispatcher homeJsp;
 	private Logger logger = Logger.getLogger(this.getClass());
+	private FoafProcessorJena fp = null;
 	
 	@Override
 	public void init(ServletConfig config) throws ServletException {
+		fp = FoafProcessorJena.getInstance();
 		ServletContext context = config.getServletContext();
+		context.setAttribute("FoafProcessor", fp);
 		homeJsp = context.getRequestDispatcher("/WEB-INF/jsp/home.jsp");
 	}
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
-
+		fp.clear();
 		logger.debug("HomeServlet.doGet()");
 		homeJsp.forward(req, resp);
 
@@ -53,7 +56,7 @@ public class HomeServlet extends HttpServlet {
 	
 	private void computeFoafConnections(HttpServletRequest req,
 			HttpServletResponse resp, Person person) throws UnsupportedEncodingException {
-		FoafProcessorJena fp = new FoafProcessorJena(6); //get the connection degree from input/config
+
 		fp.constructFoafNetwork(person);
 		//fp.constructFirstDegreeConnections();
 		//fp.constructSecondDegreeConnections();
@@ -81,6 +84,8 @@ public class HomeServlet extends HttpServlet {
 		
 		req.setAttribute("person", person);
 		req.setAttribute("friendsList", person.getFriends());
+		req.setAttribute("couldBeIntroList", person.getCouldBeIntroduced());
+		
 		/*List<String> list = new ArrayList<String>();
 		list.add("test1");
 		list.add("test2");

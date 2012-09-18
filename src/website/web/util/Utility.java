@@ -23,11 +23,14 @@ public class Utility {
 		
 	}
 	
-	public static void logJenaModel(Model model, Logger log) throws UnsupportedEncodingException {
+	public static void logJenaModelN3(Model model, Logger log) throws UnsupportedEncodingException {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		model.write(out,"N-TRIPLE");
+		model.write(out, "N3");
 		byte[] charData = out.toByteArray();
 		String str = new String(charData, "ISO-8859-1");
 		log.debug(str);		
 	}
+	
+	
+	
 }
