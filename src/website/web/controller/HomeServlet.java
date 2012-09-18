@@ -3,6 +3,8 @@ package website.web.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
@@ -52,9 +54,9 @@ public class HomeServlet extends HttpServlet {
 	private void computeFoafConnections(HttpServletRequest req,
 			HttpServletResponse resp, Person person) throws UnsupportedEncodingException {
 		FoafProcessorJena fp = new FoafProcessorJena(6); //get the connection degree from input/config
-		fp.constructFoafNetwork(person.getUri());
-		fp.constructFirstDegreeConnections();
-		fp.constructSecondDegreeConnections();
+		fp.constructFoafNetwork(person);
+		//fp.constructFirstDegreeConnections();
+		//fp.constructSecondDegreeConnections();
 	}
 
 	private void processInput(HttpServletRequest req, HttpServletResponse resp)
@@ -78,8 +80,12 @@ public class HomeServlet extends HttpServlet {
 		
 		
 		req.setAttribute("person", person);
+		req.setAttribute("friendsList", person.getFriends());
+		/*List<String> list = new ArrayList<String>();
+		list.add("test1");
+		list.add("test2");
+		req.setAttribute("friendsList", list);*/
+		
 		computeFoafConnections(req, resp, person);
 	}
-	
-
 }
