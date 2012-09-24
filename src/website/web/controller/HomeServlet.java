@@ -85,6 +85,7 @@ public class HomeServlet extends HttpServlet {
 		req.setAttribute("person", person);
 		req.setAttribute("friendsList", person.getFriends());
 		req.setAttribute("couldBeIntroList", person.getCouldBeIntroduced());
+		req.setAttribute("couldBeIntroRelList", person.getCouldBeIntroRelation());
 		
 		/*List<String> list = new ArrayList<String>();
 		list.add("test1");

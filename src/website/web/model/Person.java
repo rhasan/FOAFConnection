@@ -11,10 +11,22 @@ public class Person {
 	private List<Person> couldKnow;
 	private List<Person> couldBeIntroduced;
 	
+	private List<RelationJustification> couldBeIntroRelation;
+	
+	public List<RelationJustification> getCouldBeIntroRelation() {
+		return couldBeIntroRelation;
+	}
+
+	public void setCouldBeIntroRelation(
+			List<RelationJustification> couldBeIntroRelation) {
+		this.couldBeIntroRelation = couldBeIntroRelation;
+	}
+
 	public Person() {
 		friends = new ArrayList<Person>();
 		couldKnow = new ArrayList<Person>();
 		couldBeIntroduced = new ArrayList<Person>();
+		couldBeIntroRelation = new ArrayList<RelationJustification>();
 	}
 	
 	public String getHomepage() {

@@ -5,14 +5,18 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openjena.atlas.logging.Log;
 
 import website.web.model.Person;
+import website.web.model.RelationJustification;
 import website.web.util.Utility;
 
 import com.hp.hpl.jena.query.Dataset;
@@ -41,18 +45,31 @@ import com.hp.hpl.jena.vocabulary.RDFS;
 public class FoafProcessorJena {
 	
 	private Dataset dataset = DatasetFactory.createMem();
+	
+	private Dataset explanationDataset = DatasetFactory.createMem();
+	
 	private Logger logger = Logger.getLogger(this.getClass());
 	private static int connectionDegree = 6;
 	
 	private String foafConNS = "http://ns.inria.fr/ratio4ta/others/foafc.owl#";
+	private String ratio4taNS = "http://ns.inria.fr/ratio4ta/v2#";
 	
 	private String givenFoafUri = null;
 	private Model givenFoafModel = null;
 	private List<String> ignore = null;
 	
-	private HashMap<String, Person> allPerson = null;
+	private Hashtable<String, Person> allPerson = null;
 	
 	private static FoafProcessorJena instance = null;
+	
+	//config
+	private String baseAppURL = "http://alphubel.inria.fr:8080/website/";
+	
+	private String reasoningProcessURI = baseAppURL + "j/" + UUID.randomUUID();
+	private String resultURI = baseAppURL + "j/" + UUID.randomUUID();
+	private String softwareAppURI = baseAppURL + "FoafConnection";
+	private String derivationURI = baseAppURL + "j/" + UUID.randomUUID();
+	
 	
 	public void clear() {
 		instance = null;
@@ -75,7 +92,7 @@ public class FoafProcessorJena {
 		ignore = new ArrayList<String>();
 		ignore.add("http://www-sop.inria.fr/members/Olivier.Corby/");
 		
-		allPerson = new HashMap<String, Person>();		
+		allPerson = new Hashtable<String, Person>();		
 	}
 	
 	public void processFoafConnections(String foafUri, Model model, int depth) {
@@ -187,12 +204,13 @@ public class FoafProcessorJena {
 		processFoafConnections(foafUri, givenFoafModel, 0);
 		
 		//logger
-		Utility.logJenaModelN3(givenFoafModel, logger);
+		//Utility.logJenaModelN3(givenFoafModel, logger);
 		//create a working copy of the model with removing the blank nodes and unnecessary things such as graph names
 		//refineModel();
 		mapRDF2Object();
 		
 		constructCouldBeIntroduced();
+		Utility.logJenaModelN3(givenFoafModel, logger);
 	
 	}
 	
@@ -259,9 +277,11 @@ public class FoafProcessorJena {
 		    }
 			
 			
-		} finally { qExec.close() ; }		
+		} finally { qExec.close() ; }
+		
 	}
 	
+
 	private Person personFromHash(String personUri) {
 	      Person currentPerson = allPerson.get(personUri);
 	      if(currentPerson == null) {
@@ -278,10 +298,13 @@ public class FoafProcessorJena {
 				" GRAPH ?source1 {?f1 <http://xmlns.com/foaf/0.1/knows> ?f2}." +
 				" FILTER( !isBlank(?f1) && !isBlank(?f2))}";		
 		logger.debug(query);
+		
+		Property propCouldBeIntro = dataset.getDefaultModel().createProperty(foafConNS+"couldBeIntroduced");		
 		QueryExecution qExec = QueryExecutionFactory.create(query, dataset);
 		//ResultSet results = qExec.execSelect();
 		//logger.debug(ResultSetFormatter.asText(results));
-		
+		List<Statement> inferredStatements = new ArrayList<Statement>();
+
 		try {
 			ResultSet results = qExec.execSelect();
 			//logger.debug(ResultSetFormatter.asText(results));
@@ -293,23 +316,112 @@ public class FoafProcessorJena {
 		      
 		      Person currentPerson = personFromHash(givenFoafUri);		      
 		      
-		      //RDFNode x = soln.get("varName") ;      
-		      //Resource friend = soln.getResource("f1"); 
+		      //RDFNode x = soln.get("varName") ;
+		      Resource cPerson = dataset.getDefaultModel().createResource(givenFoafUri);
+		      Resource friend = soln.getResource("f1"); 
+		      //Resource couldBeIntro = soln.getResource("f2");
 		      Resource couldBeIntro = soln.getResource("f2");
+		      
+		      Person friendPerson = personFromHash(friend.getURI());
 		      
 		      Person couldBeIntroPerson = personFromHash(couldBeIntro.getURI());
 		      currentPerson.getCouldBeIntroduced().add(couldBeIntroPerson);
+		      
+		      Statement st = new StatementImpl(cPerson, propCouldBeIntro, couldBeIntro);
+		      logger.debug(st.toString());
+		      inferredStatements.add(st);
+		      
+		      String justificationURI = explainCouldBeIntroduced(currentPerson, friendPerson, couldBeIntroPerson,st);
+		      
+		      RelationJustification rj = new RelationJustification();
+		      rj.setPerson(couldBeIntroPerson);
+		      rj.setJustificationUri(justificationURI);
+		      currentPerson.getCouldBeIntroRelation().add(rj);
 		    }
 			
 		} finally { qExec.close() ; }
 		
-		SparqlInsert();
+		//SparqlInsert();
+		assertInferredStatements(inferredStatements,givenFoafUri);
 
+	}
+
+	void assertInferredStatements(List<Statement> inferredStatements, String graphName)  {
+		Model m = dataset.getNamedModel(graphName);
+		//m.add((Statement[]) inferredStatements.toArray(new Statement[inferredStatements.size()]));
+		m.add(inferredStatements);
+		
+	}
+	
+	
+	public String explainCouldBeIntroduced(Person currentPerson, Person friendPerson, Person couldBeIntroPerson, Statement st) {
+		UUID justificationUUID = UUID.randomUUID();
+		UUID statementUUID = UUID.randomUUID();
+		String justificationURI = baseAppURL + "j/" + justificationUUID;
+		
+		String statementURI = baseAppURL + "d/" + statementUUID;
+		String usedDataURI = baseAppURL + "d/" + UUID.randomUUID();
+		
+		
+		Model usedDm = ModelFactory.createDefaultModel();
+		Resource p1 = usedDm.createResource(currentPerson.getUri());
+		Resource p2 = usedDm.createResource(friendPerson.getUri());
+		Resource p3 = usedDm.createResource(couldBeIntroPerson.getUri());
+		Statement s1 = new StatementImpl(p1, FOAF.knows, p2);
+		Statement s2 = new StatementImpl(p2, FOAF.knows, p3);
+		usedDm.add(s1);
+		usedDm.add(s2);
+		explanationDataset.addNamedModel(usedDataURI, usedDm);
+		
+		Model inferredDm = ModelFactory.createDefaultModel();
+		
+		inferredDm.add(st);
+		explanationDataset.addNamedModel(statementURI, inferredDm);
+		//String r4ta_justifies = ratio4taNS + "justifies";
+
+		//String dataGraphQuery = "PREFIX r4ta: <"+ratio4taNS+"> " +
+				//"PREFIX fc: <http://ns.inria.fr/ratio4ta/others/foafc.owl#> " +
+				
+				//"INSERT DATA { GRAPH <"+statementURI+"> { <"+currentPerson.getUri()+">  fc:couldBeIntroduced  <"+statementURI+"> } }";
+		
+		//logger.debug(dataGraphQuery);
+		//UpdateAction.parseExecute(dataGraphQuery, explanationDataset);		
+		
+		logger.debug("creating justification: "+justificationURI);
+		String updateString = "PREFIX r4ta: <"+ratio4taNS+"> " +
+				"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
+				"INSERT DATA { GRAPH <"+justificationURI+"> { <"+justificationURI+">  r4ta:justifies  <"+statementURI+">. " +
+						"<"+statementURI+"> r4ta:justifiedBy  <"+justificationURI+">. " +
+								"<"+reasoningProcessURI+"> rdf:type r4ta:ReasoningProcess. " +
+										"<"+softwareAppURI+"> rdf:type r4ta:SoftwareApplication. " +
+												"<"+statementURI+"> rdf:type r4ta:OutputData. "+
+												"<"+resultURI+"> rdf:type r4ta:Result. "+
+												"<"+usedDataURI+"> rdf:type r4ta:InputData." +
+														"<"+reasoningProcessURI+"> r4ta:performedBy <"+softwareAppURI+">." +
+															"<"+reasoningProcessURI+"> r4ta:usedData <"+usedDataURI+">." +
+															"<"+reasoningProcessURI+"> r4ta:computed <"+resultURI+">." +
+															"<"+reasoningProcessURI+"> r4ta:produced <"+statementURI+">." +
+															"<"+statementURI+"> r4ta:derivedFrom <"+usedDataURI+">." +
+															"<"+statementURI+"> r4ta:belongsTo <"+resultURI+">." +
+															"<"+statementURI+"> r4ta:derivedBy <"+derivationURI+">." +
+															"<"+derivationURI+"> r4ta:usedRule <http://example.com/rule>." +
+															"<"+derivationURI+"> r4ta:wasInvolvedInComputing <"+resultURI+">." +
+															"<"+derivationURI+"> r4ta:derivationReasoner <"+softwareAppURI+">." +
+															"<"+derivationURI+"> r4ta:performedAsPartOf <"+reasoningProcessURI+">" +
+														" } }";		
+
+		
+		
+		logger.debug(updateString);
+		UpdateAction.parseExecute(updateString, explanationDataset);
+		return justificationURI;
+		
 	}
 	
 	public void SparqlInsert() {
 		//GraphStore graphStore = GraphStoreFactory.create(dataset) ;
-		String updateString = "INSERT DATA { GRAPH <http://localhost:8080/website/j/4> { <http://example/book1>  <http://example.org/ns#price>  42 } }";
+		String graphURL = baseAppURL+"j/4";
+		String updateString = "INSERT DATA { GRAPH <"+graphURL+"> { <http://example/book1>  <http://example.org/ns#price>  42 } }";
 		UpdateAction.parseExecute(updateString, dataset);
 		logger.debug("Print from insert");
 		printInsert();
@@ -317,7 +429,8 @@ public class FoafProcessorJena {
 	}
 	
 	public void printInsert() {
-		String query = "select * where  { GRAPH <http://localhost:8080/website/j/4> { ?s  ?p  ?o } }";
+		String graphURL = baseAppURL+"j/4";
+		String query = "select * where  { GRAPH <"+graphURL+"> { ?s  ?p  ?o } }";
 		
 		QueryExecution qExec = QueryExecutionFactory.create(query, dataset);
 		ResultSet results = qExec.execSelect();
@@ -325,9 +438,9 @@ public class FoafProcessorJena {
 		
 	}
 	
-	public Model getNamedGraphStatements(String graphURI) {
+	public Model getExpNamedGraphStatements(String graphURI) {
 		String query = "construct {?s ?p ?o} where  { GRAPH <"+graphURI+"> { ?s  ?p  ?o } }";
-		QueryExecution qExec = QueryExecutionFactory.create(query, dataset);
+		QueryExecution qExec = QueryExecutionFactory.create(query, explanationDataset);
 		Model refinedModel = qExec.execConstruct();
 
 		return refinedModel;

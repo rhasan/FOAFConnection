@@ -1,8 +1,10 @@
+<%@page import="website.web.model.RelationJustification"%>
 <%@ page import="java.util.Iterator" %>
 <%@ page import="website.web.model.Person" %>
 <jsp:useBean id="person" scope="request" class="website.web.model.Person" />
 <jsp:useBean id="friendsList" scope="request" class="java.util.ArrayList" />
 <jsp:useBean id="couldBeIntroList" scope="request" class="java.util.ArrayList" />
+<jsp:useBean id="couldBeIntroRelList" scope="request" class="java.util.ArrayList" />
 <jsp:useBean id="errorMessage" scope="request" class="java.lang.String" />
 
 <html>
@@ -65,9 +67,12 @@ ${errorMessage}
 	
 		<ul>
 			<%
-				Iterator it1 = couldBeIntroList.iterator();
+				Iterator it1 = couldBeIntroRelList.iterator();
 				while (it1.hasNext()) {
-					Person personItem = (Person) it1.next();
+					
+					RelationJustification rj = (RelationJustification)it1.next();
+					Person personItem = rj.getPerson();
+					String justUri = rj.getJustificationUri();
 			%>
 			<li>
 				<ul>
@@ -75,6 +80,7 @@ ${errorMessage}
 					<%if(personItem.getName() != null) { %>
 						<li><%=personItem.getName()%></li>
 					<%} %>
+					<li><a href="<%=justUri%>" target="_blank">Why</a> </li>
 				</ul>
 			</li>
 			<%

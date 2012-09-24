@@ -21,5 +21,14 @@
    <servlet-mapping>
       <servlet-name>j</servlet-name>
       <url-pattern>/j/*</url-pattern>
-   </servlet-mapping>    
+   </servlet-mapping>
+   
+   <servlet>
+      <servlet-name>d</servlet-name>
+      <servlet-class>website.web.controller.DataServlet</servlet-class>
+   </servlet>
+   <servlet-mapping>
+      <servlet-name>d</servlet-name>
+      <url-pattern>/d/*</url-pattern>
+   </servlet-mapping>       
 </web-app>
