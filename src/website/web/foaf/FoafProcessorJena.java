@@ -63,7 +63,8 @@ public class FoafProcessorJena {
 	private static FoafProcessorJena instance = null;
 	
 	//config
-	private String baseAppURL = "http://alphubel.inria.fr:8080/website/";
+	//private String baseAppURL = "http://alphubel.inria.fr:8080/website/";
+	private String baseAppURL = "http://alphubel.unice.fr:8080/website/";
 	
 	private String reasoningProcessURI = baseAppURL + "j/" + UUID.randomUUID();
 	private String resultURI = baseAppURL + "j/" + UUID.randomUUID();
